@@ -50,6 +50,8 @@ iOS10.0+
 * NSCameraUsageDescription
 
 ## Installation
+*Please set up your project Swift 4.0.*
+
 ### CocoaPods
 ```rb
 source 'https://github.com/CocoaPods/Specs.git'
@@ -209,6 +211,17 @@ httpService.addHTTPStream(httpStream)
 // add ViewController#view
 view.addSubview(lfView)
 ```
+
+## FAQ
+### How can I run example project?
+Please hit `carthage update` command. HaishinKit needs Logboard module via Carthage.
+```sh
+carthage update
+```
+
+### Do you support me via Email?
+Yes. Consulting fee is $50/1 incident. I don't recommend.
+Please consider to use Issues.
 
 ## Reference
 * Adobe’s Real Time Messaging Protocol

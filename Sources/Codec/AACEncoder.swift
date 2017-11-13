@@ -73,10 +73,10 @@ final class AACEncoder: NSObject {
     var lockQueue:DispatchQueue = DispatchQueue(label: "com.haishinkit.HaishinKit.AACEncoder.lock")
     weak var delegate:AudioEncoderDelegate?
     internal(set) var running:Bool = false
-    fileprivate var maximumBuffers:Int = AACEncoder.defaultMaximumBuffers
-    fileprivate var bufferListSize:Int = AACEncoder.defaultBufferListSize
-    fileprivate var currentBufferList:UnsafeMutableAudioBufferListPointer? = nil
-    fileprivate var inSourceFormat:AudioStreamBasicDescription? {
+    private var maximumBuffers:Int = AACEncoder.defaultMaximumBuffers
+    private var bufferListSize:Int = AACEncoder.defaultBufferListSize
+    private var currentBufferList:UnsafeMutableAudioBufferListPointer? = nil
+    private var inSourceFormat:AudioStreamBasicDescription? {
         didSet {
             logger.info("\(String(describing: self.inSourceFormat))")
             guard let inSourceFormat:AudioStreamBasicDescription = self.inSourceFormat else {
@@ -87,8 +87,8 @@ final class AACEncoder: NSObject {
             bufferListSize = nonInterleaved ? AudioBufferList.sizeInBytes(maximumBuffers: maximumBuffers) : AACEncoder.defaultBufferListSize
         }
     }
-    fileprivate var _inDestinationFormat:AudioStreamBasicDescription?
-    fileprivate var inDestinationFormat:AudioStreamBasicDescription {
+    private var _inDestinationFormat:AudioStreamBasicDescription?
+    private var inDestinationFormat:AudioStreamBasicDescription {
         get {
             if (_inDestinationFormat == nil) {
                 _inDestinationFormat = AudioStreamBasicDescription()
@@ -113,7 +113,7 @@ final class AACEncoder: NSObject {
         }
     }
 
-    fileprivate var inputDataProc:AudioConverterComplexInputDataProc = {(
+    private var inputDataProc:AudioConverterComplexInputDataProc = {(
         converter:AudioConverterRef,
         ioNumberDataPackets:UnsafeMutablePointer<UInt32>,
         ioData:UnsafeMutablePointer<AudioBufferList>,
@@ -126,8 +126,8 @@ final class AACEncoder: NSObject {
         )
     }
 
-    fileprivate var _converter:AudioConverterRef?
-    fileprivate var converter:AudioConverterRef {
+    private var _converter:AudioConverterRef?
+    private var converter:AudioConverterRef {
         var status:OSStatus = noErr
         if (_converter == nil) {
             var converter:AudioConverterRef? = nil
@@ -177,48 +177,53 @@ final class AACEncoder: NSObject {
             &blockBuffer
         )
 
+        if (blockBuffer == nil) {
+            logger.warn("IllegalState for blockBuffer")
+            return
+        }
+
         if (muted) {
             for i in 0..<currentBufferList!.count {
                 memset(currentBufferList![i].mData, 0, Int(currentBufferList![i].mDataByteSize))
             }
         }
 
-        if (blockBuffer == nil) {
-            logger.warn("IllegalState for blockBuffer")
-            return
+        var finished = false
+        while !finished {
+            var ioOutputDataPacketSize:UInt32 = 1
+            let dataLength:Int = blockBuffer!.dataLength
+            let outOutputData:UnsafeMutableAudioBufferListPointer = AudioBufferList.allocate(maximumBuffers: 1)
+            outOutputData[0].mNumberChannels = inDestinationFormat.mChannelsPerFrame
+            outOutputData[0].mDataByteSize = UInt32(dataLength)
+            outOutputData[0].mData = UnsafeMutableRawPointer.allocate(bytes: dataLength, alignedTo: 0)
+
+            let status:OSStatus = AudioConverterFillComplexBuffer(
+                converter,
+                inputDataProc,
+                Unmanaged.passUnretained(self).toOpaque(),
+                &ioOutputDataPacketSize,
+                outOutputData.unsafeMutablePointer,
+                nil
+            )
+
+            // XXX: perhaps mistake. but can support macOS BuiltIn Mic #61
+            if (0 <= status && ioOutputDataPacketSize == 1) {
+                var result:CMSampleBuffer?
+                var timing:CMSampleTimingInfo = CMSampleTimingInfo(sampleBuffer: sampleBuffer)
+                let numSamples:CMItemCount = sampleBuffer.numSamples
+                CMSampleBufferCreate(kCFAllocatorDefault, nil, false, nil, nil, formatDescription, numSamples, 1, &timing, 0, nil, &result)
+                CMSampleBufferSetDataBufferFromAudioBufferList(result!, kCFAllocatorDefault, kCFAllocatorDefault, 0, outOutputData.unsafePointer)
+                delegate?.sampleOutput(audio: result!)
+            } else {
+                finished = true
+            }
+
+            for i in 0..<outOutputData.count {
+                free(outOutputData[i].mData)
+            }
+
+            free(outOutputData.unsafeMutablePointer)
         }
-
-        var ioOutputDataPacketSize:UInt32 = 1
-        let dataLength:Int = blockBuffer!.dataLength
-        let outOutputData:UnsafeMutableAudioBufferListPointer = AudioBufferList.allocate(maximumBuffers: 1)
-        outOutputData[0].mNumberChannels = inDestinationFormat.mChannelsPerFrame
-        outOutputData[0].mDataByteSize = UInt32(dataLength)
-        outOutputData[0].mData = UnsafeMutableRawPointer.allocate(bytes: dataLength, alignedTo: 0)
-
-        let status:OSStatus = AudioConverterFillComplexBuffer(
-            converter,
-            inputDataProc,
-            Unmanaged.passUnretained(self).toOpaque(),
-            &ioOutputDataPacketSize,
-            outOutputData.unsafeMutablePointer,
-            nil
-        )
-
-        // XXX: perhaps mistake. but can support macOS BuiltIn Mic #61
-        if (0 <= status && ioOutputDataPacketSize == 1) {
-            var result:CMSampleBuffer?
-            var timing:CMSampleTimingInfo = CMSampleTimingInfo(sampleBuffer: sampleBuffer)
-            let numSamples:CMItemCount = sampleBuffer.numSamples
-            CMSampleBufferCreate(kCFAllocatorDefault, nil, false, nil, nil, formatDescription, numSamples, 1, &timing, 0, nil, &result)
-            CMSampleBufferSetDataBufferFromAudioBufferList(result!, kCFAllocatorDefault, kCFAllocatorDefault, 0, outOutputData.unsafePointer)
-            delegate?.sampleOutput(audio: result!)
-        }
-
-        for i in 0..<outOutputData.count {
-            free(outOutputData[i].mData)
-        }
-    
-        free(outOutputData.unsafeMutablePointer)
     }
 
     func invalidate() {
@@ -241,6 +246,7 @@ final class AACEncoder: NSObject {
             ioNumberDataPackets.pointee = 0
             return -1
         }
+
 
         memcpy(ioData, bufferList.unsafePointer, bufferListSize)
         ioNumberDataPackets.pointee = 1
