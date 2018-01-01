@@ -1,6 +1,6 @@
 import Foundation
 
-enum FLVVideoCodec: UInt8 {
+public enum FLVVideoCodec: UInt8 {
     case sorensonH263 = 2
     case screen1      = 3
     case on2VP6       = 4
@@ -8,8 +8,8 @@ enum FLVVideoCodec: UInt8 {
     case screen2      = 6
     case avc          = 7
     case unknown      = 0xFF
-    
-    var isSupported:Bool {
+
+    var isSupported: Bool {
         switch self {
         case .sorensonH263:
             return false
