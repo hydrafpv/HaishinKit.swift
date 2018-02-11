@@ -10,10 +10,3 @@ protocol Runnable: class {
     func startRunning()
     func stopRunning()
 }
-
-// MARK: -
-protocol Iterator {
-    associatedtype Element
-    func hasNext() -> Bool
-    func next() -> Element?
-}

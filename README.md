@@ -77,20 +77,20 @@ BSD-3-Clause
 ## Donation
 Bitcoin
 ```txt
-1CWA9muX36QKBdJiRQJGpu2HvchfEpJbWr
+17N3qWCKjwJrWrDuyeHaqWkZYnJqX7igXN
 ```
 
 ## Prerequisites
 Make sure you setup and activate your AVAudioSession.
 ```swift
 import AVFoundation
-
+let session: AVAudioSession = AVAudioSession.sharedInstance()
 do {
-   try AVAudioSession.sharedInstance().setPreferredSampleRate(44_100)
-   try AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayAndRecord)
-   try AVAudioSession.sharedInstance().setMode(AVAudioSessionModeDefault)
-   try AVAudioSession.sharedInstance().setActive(true)
-   } catch {
+    try session.setPreferredSampleRate(44_100)
+    try session.setCategory(AVAudioSessionCategoryPlayAndRecord, with: .allowBluetooth)
+    try session.setMode(AVAudioSessionModeDefault)
+    try session.setActive(true)
+} catch {
 }
 ```
 ## RTMP Usage
@@ -123,11 +123,12 @@ let sampleRate:Double = 44_100
 
 // see: #58
 #if(iOS)
+let session: AVAudioSession = AVAudioSession.sharedInstance()
 do {
-    try AVAudioSession.sharedInstance().setPreferredSampleRate(sampleRate)
-    try AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayAndRecord)
-    try AVAudioSession.sharedInstance().setMode(AVAudioSessionModeDefault)
-    try AVAudioSession.sharedInstance().setActive(true)
+    try session.setPreferredSampleRate(44_100)
+    try session.setCategory(AVAudioSessionCategoryPlayAndRecord, with: .allowBluetooth)
+    try session.setMode(AVAudioSessionModeDefault)
+    try session.setActive(true)
 } catch {
 }
 #endif
