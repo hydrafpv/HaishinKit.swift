@@ -166,15 +166,15 @@ final class H264Encoder: NSObject {
             kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration: NSNumber(value: maxKeyFrameIntervalDuration),
             kVTCompressionPropertyKey_AllowFrameReordering: !isBaseline as NSObject,
             kVTCompressionPropertyKey_PixelTransferProperties: [
-                "ScalingMode": scalingMode
+                kVTPixelTransferPropertyKey_ScalingMode: scalingMode
             ] as NSObject
         ]
 
 #if os(OSX)
         if enabledHardwareEncoder {
             properties[kVTVideoEncoderSpecification_EncoderID] = "com.apple.videotoolbox.videoencoder.h264.gva" as NSObject
-            properties["EnableHardwareAcceleratedVideoEncoder"] = kCFBooleanTrue
-            properties["RequireHardwareAcceleratedVideoEncoder"] = kCFBooleanTrue
+            properties[kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder] = kCFBooleanTrue
+            properties[kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder] = kCFBooleanTrue
         }
 #endif
 
