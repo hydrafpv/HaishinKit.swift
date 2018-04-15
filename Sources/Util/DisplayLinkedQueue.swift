@@ -63,9 +63,7 @@ final class DisplayLinkedQueue: NSObject {
     private var mediaTime: CFTimeInterval = 0
     private var displayLink: DisplayLink? {
         didSet {
-            if let oldValue: DisplayLink = oldValue {
-                oldValue.invalidate()
-            }
+            oldValue?.invalidate()
             guard let displayLink: DisplayLink = displayLink else {
                 return
             }
@@ -73,7 +71,7 @@ final class DisplayLinkedQueue: NSObject {
             displayLink.add(to: .main, forMode: .commonModes)
         }
     }
-    private let lockQueue: DispatchQueue = DispatchQueue(label: "com.haishinkit.HaishinKit.DisplayLinkedQueue.lock")
+    private let lockQueue = DispatchQueue(label: "com.haishinkit.HaishinKit.DisplayLinkedQueue.lock")
 
     func enqueue(_ buffer: CMSampleBuffer) {
         lockQueue.async {
@@ -109,7 +107,7 @@ extension DisplayLinkedQueue: Running {
                 return
             }
             self.displayLink = DisplayLink(target: self, selector: #selector(self.update(displayLink:)))
-            self.running = false
+            self.running = true
         }
     }
 

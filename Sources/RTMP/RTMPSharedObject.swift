@@ -65,7 +65,8 @@ struct RTMPSharedObjectEvent {
         let size: Int = serializer.position - position
         serializer.position = position
         serializer.writeUInt32(UInt32(size) - 4)
-        serializer.position = serializer.length
+        let length = serializer.length
+        serializer.position = length
     }
 }
 
@@ -141,7 +142,7 @@ open class RTMPSharedObject: EventDispatcher {
             close()
         }
         self.rtmpConnection = rtmpConnection
-        rtmpConnection.addEventListener(Event.RTMP_STATUS, selector: #selector(RTMPSharedObject.rtmpStatusHandler(_: )), observer: self)
+        rtmpConnection.addEventListener(Event.RTMP_STATUS, selector: #selector(rtmpStatusHandler), observer: self)
         if rtmpConnection.connected {
             timestamp = rtmpConnection.socket.timestamp
             rtmpConnection.socket.doOutput(chunk: createChunk([RTMPSharedObjectEvent(type: .use)]), locked: nil)
@@ -155,7 +156,7 @@ open class RTMPSharedObject: EventDispatcher {
 
     open func close() {
         data.removeAll(keepingCapacity: false)
-        rtmpConnection?.removeEventListener(Event.RTMP_STATUS, selector: #selector(RTMPSharedObject.rtmpStatusHandler(_: )), observer: self)
+        rtmpConnection?.removeEventListener(Event.RTMP_STATUS, selector: #selector(rtmpStatusHandler), observer: self)
         rtmpConnection?.socket.doOutput(chunk: createChunk([RTMPSharedObjectEvent(type: .release)]), locked: nil)
         rtmpConnection = nil
     }

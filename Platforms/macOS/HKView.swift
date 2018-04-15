@@ -1,12 +1,12 @@
 import Foundation
 import AVFoundation
 
-open class LFView: NSView {
-    public static var defaultBackgroundColor: NSColor = NSColor.black
+open class HKView: NSView {
+    public static var defaultBackgroundColor: NSColor = .black
 
-    public var videoGravity: String = AVLayerVideoGravity.resizeAspect.rawValue {
+    public var videoGravity: AVLayerVideoGravity = .resizeAspect {
         didSet {
-            layer?.setValue(videoGravity, forKey: "videoGravity")
+            layer?.setValue(videoGravity.rawValue, forKey: "videoGravity")
         }
     }
 
@@ -21,10 +21,7 @@ open class LFView: NSView {
 
     private weak var currentStream: NetStream? {
         didSet {
-            guard let oldValue: NetStream = oldValue else {
-                return
-            }
-            oldValue.mixer.videoIO.drawable = nil
+            oldValue?.mixer.videoIO.drawable = nil
         }
     }
 
@@ -40,7 +37,7 @@ open class LFView: NSView {
     open override func awakeFromNib() {
         wantsLayer = true
         layer = AVCaptureVideoPreviewLayer()
-        layer?.backgroundColor = LFView.defaultBackgroundColor.cgColor
+        layer?.backgroundColor = HKView.defaultBackgroundColor.cgColor
         layer?.setValue(videoGravity, forKey: "videoGravity")
     }
 
@@ -58,7 +55,7 @@ open class LFView: NSView {
     }
 }
 
-extension LFView: NetStreamDrawable {
+extension HKView: NetStreamDrawable {
     // MARK: NetStreamDrawable
     func draw(image: CIImage) {
     }

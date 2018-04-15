@@ -2,7 +2,7 @@ import GLKit
 import Foundation
 import AVFoundation
 
-open class GLLFView: GLKView {
+open class GLHKView: GLKView {
     static let defaultOptions: [String: AnyObject] = [
         kCIContextWorkingColorSpace: NSNull(),
         kCIContextUseSoftwareRenderer: NSNumber(value: false)
@@ -12,10 +12,7 @@ open class GLLFView: GLKView {
     private var displayImage: CIImage?
     private weak var currentStream: NetStream? {
         didSet {
-            guard let oldValue: NetStream = oldValue else {
-                return
-            }
-            oldValue.mixer.videoIO.drawable = nil
+            oldValue?.mixer.videoIO.drawable = nil
         }
     }
 
@@ -31,8 +28,8 @@ open class GLLFView: GLKView {
 
     open override func awakeFromNib() {
         enableSetNeedsDisplay = true
-        backgroundColor = GLLFView.defaultBackgroundColor
-        layer.backgroundColor = GLLFView.defaultBackgroundColor.cgColor
+        backgroundColor = GLHKView.defaultBackgroundColor
+        layer.backgroundColor = GLHKView.defaultBackgroundColor.cgColor
     }
 
     open override func draw(_ rect: CGRect) {
@@ -42,13 +39,14 @@ open class GLLFView: GLKView {
         }
         var inRect: CGRect = CGRect(x: 0, y: 0, width: CGFloat(drawableWidth), height: CGFloat(drawableHeight))
         var fromRect: CGRect = displayImage.extent
-        VideoGravityUtil.calclute(videoGravity, inRect: &inRect, fromRect: &fromRect)
+        VideoGravityUtil.calculate(videoGravity, inRect: &inRect, fromRect: &fromRect)
         currentStream?.mixer.videoIO.context?.draw(displayImage, in: inRect, from: fromRect)
     }
 
     open func attachStream(_ stream: NetStream?) {
         if let stream: NetStream = stream {
             stream.lockQueue.async {
+                stream.mixer.videoIO.context = CIContext(eaglContext: self.context, options: GLHKView.defaultOptions)
                 stream.mixer.videoIO.drawable = self
                 stream.mixer.startRunning()
             }
@@ -57,7 +55,7 @@ open class GLLFView: GLKView {
     }
 }
 
-extension GLLFView: NetStreamDrawable {
+extension GLHKView: NetStreamDrawable {
     // MARK: NetStreamDrawable
     func draw(image: CIImage) {
         DispatchQueue.main.async {

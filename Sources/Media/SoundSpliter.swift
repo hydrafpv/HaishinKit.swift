@@ -10,7 +10,7 @@ public class SoundSpliter: NSObject {
     static let defaultSampleSize: Int = 1024
     public weak var delegate: SoundSpliterDelegate?
 
-    private let lockQueue: DispatchQueue = DispatchQueue(label: "com.haishinkit.HaishinKit.SoundMixer.lock")
+    private let lockQueue = DispatchQueue(label: "com.haishinkit.HaishinKit.SoundMixer.lock")
     private(set) var status: OSStatus = noErr {
         didSet {
             if status != 0 {
@@ -25,7 +25,7 @@ public class SoundSpliter: NSObject {
     private var presentationTimeStamp: CMTime = kCMTimeZero
 
     private var minimumByteSize: Int {
-        return min(Int.max, sampleData.count)
+        return min(.max, sampleData.count)
     }
 
     public func appendSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
@@ -86,7 +86,7 @@ public class SoundSpliter: NSObject {
             buffer.unsafeMutablePointer.pointee.mNumberBuffers = 1
             buffer.unsafeMutablePointer.pointee.mBuffers.mNumberChannels = 1
             buffer.unsafeMutablePointer.pointee.mBuffers.mDataByteSize = UInt32(frameSize)
-            buffer.unsafeMutablePointer.pointee.mBuffers.mData = UnsafeMutableRawPointer.allocate(bytes: frameSize, alignedTo: 0)
+            buffer.unsafeMutablePointer.pointee.mBuffers.mData = UnsafeMutableRawPointer.allocate(byteCount: frameSize, alignment: 0)
             wave.copyBytes(
                 to: buffer.unsafeMutablePointer.pointee.mBuffers.mData!.assumingMemoryBound(to: UInt8.self),
                 count: Int(buffer.unsafeMutablePointer.pointee.mBuffers.mDataByteSize)
@@ -105,7 +105,7 @@ public class SoundSpliter: NSObject {
                 }
                 presentationTimeStamp = CMTimeAdd(presentationTimeStamp, result.duration)
             }
-            buffer.unsafeMutablePointer.pointee.mBuffers.mData?.deallocate(bytes: frameSize, alignedTo: 0)
+            buffer.unsafeMutablePointer.pointee.mBuffers.mData?.deallocate()
         }
     }
 
