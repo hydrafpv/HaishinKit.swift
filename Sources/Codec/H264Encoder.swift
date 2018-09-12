@@ -123,7 +123,7 @@ final class H264Encoder: NSObject {
     }
     var formatDescription: CMFormatDescription? {
         didSet {
-            guard !CMFormatDescriptionEqual(formatDescription, oldValue) else {
+            guard !CMFormatDescriptionEqual(formatDescription, otherFormatDescription: oldValue) else {
                 return
             }
             delegate?.didSetFormatDescription(video: formatDescription)
@@ -165,15 +165,15 @@ final class H264Encoder: NSObject {
             kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration: NSNumber(value: maxKeyFrameIntervalDuration),
             kVTCompressionPropertyKey_AllowFrameReordering: !isBaseline as NSObject,
             kVTCompressionPropertyKey_PixelTransferProperties: [
-                kVTPixelTransferPropertyKey_ScalingMode: scalingMode
+                "ScalingMode": scalingMode
             ] as NSObject
         ]
 
 #if os(OSX)
         if enabledHardwareEncoder {
             properties[kVTVideoEncoderSpecification_EncoderID] = "com.apple.videotoolbox.videoencoder.h264.gva" as NSObject
-            properties[kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder] = kCFBooleanTrue
-            properties[kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder] = kCFBooleanTrue
+            properties["EnableHardwareAcceleratedVideoEncoder"] = kCFBooleanTrue
+            properties["RequireHardwareAcceleratedVideoEncoder"] = kCFBooleanTrue
         }
 #endif
 
@@ -207,22 +207,22 @@ final class H264Encoder: NSObject {
         get {
             if _session == nil {
                 guard VTCompressionSessionCreate(
-                    kCFAllocatorDefault,
-                    width,
-                    height,
-                    kCMVideoCodecType_H264,
-                    nil,
-                    attributes as CFDictionary?,
-                    nil,
-                    callback,
-                    Unmanaged.passUnretained(self).toOpaque(),
-                    &_session
+                    allocator: kCFAllocatorDefault,
+                    width: width,
+                    height: height,
+                    codecType: kCMVideoCodecType_H264,
+                    encoderSpecification: nil,
+                    imageBufferAttributes: attributes as CFDictionary?,
+                    compressedDataAllocator: nil,
+                    outputCallback: callback,
+                    refcon: Unmanaged.passUnretained(self).toOpaque(),
+                    compressionSessionOut: &_session
                     ) == noErr else {
                     logger.warn("create a VTCompressionSessionCreate")
                     return nil
                 }
                 invalidateSession = false
-                status = VTSessionSetProperties(_session!, properties as CFDictionary)
+                status = VTSessionSetProperties(_session!, propertyDictionary: properties as CFDictionary)
                 status = VTCompressionSessionPrepareToEncodeFrames(_session!)
                 supportedProperty = _session?.copySupportedPropertyDictionary()
             }
@@ -249,12 +249,12 @@ final class H264Encoder: NSObject {
         var flags: VTEncodeInfoFlags = []
         VTCompressionSessionEncodeFrame(
             session,
-            muted ? lastImageBuffer ?? imageBuffer : imageBuffer,
-            presentationTimeStamp,
-            duration,
-            nil,
-            nil,
-            &flags
+            imageBuffer: muted ? lastImageBuffer ?? imageBuffer : imageBuffer,
+            presentationTimeStamp: presentationTimeStamp,
+            duration: duration,
+            frameProperties: nil,
+            sourceFrameRefcon: nil,
+            infoFlagsOut: &flags
         )
         if !muted {
             lastImageBuffer = imageBuffer
@@ -268,8 +268,8 @@ final class H264Encoder: NSObject {
             }
             self.status = VTSessionSetProperty(
                 session,
-                key,
-                value
+                key: key,
+                value: value
             )
         }
     }
