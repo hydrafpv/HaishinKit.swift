@@ -22,12 +22,12 @@ public enum EventPhase: UInt8 {
  flash.events.Event for Swift
  */
 open class Event: NSObject {
-    open static let SYNC: String = "sync"
-    open static let EVENT: String = "event"
-    open static let IO_ERROR: String = "ioError"
-    open static let RTMP_STATUS: String = "rtmpStatus"
+    public static let SYNC: String = "sync"
+    public static let EVENT: String = "event"
+    public static let IO_ERROR: String = "ioError"
+    public static let RTMP_STATUS: String = "rtmpStatus"
 
-    open static func from(_ notification: Notification) -> Event {
+    public static func from(_ notification: Notification) -> Event {
         guard
             let userInfo: [AnyHashable: Any] = notification.userInfo,
             let event: Event = userInfo["event"] as? Event else {
@@ -74,13 +74,13 @@ open class EventDispatcher: NSObject, IEventDispatcher {
 
     public final func addEventListener(_ type: String, selector: Selector, observer: AnyObject? = nil, useCapture: Bool = false) {
         NotificationCenter.default.addObserver(
-            observer ?? target ?? self, selector: selector, name: NSNotification.Name(rawValue: "\(type)/\(useCapture)"), object: target ?? self
+            observer ?? target ?? self, selector: selector, name: Notification.Name(rawValue: "\(type)/\(useCapture)"), object: target ?? self
         )
     }
 
     public final func removeEventListener(_ type: String, selector: Selector, observer: AnyObject? = nil, useCapture: Bool = false) {
         NotificationCenter.default.removeObserver(
-            observer ?? target ?? self, name: NSNotification.Name(rawValue: "\(type)/\(useCapture)"), object: target ?? self
+            observer ?? target ?? self, name: Notification.Name(rawValue: "\(type)/\(useCapture)"), object: target ?? self
         )
     }
 
