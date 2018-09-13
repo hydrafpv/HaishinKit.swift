@@ -2,6 +2,10 @@ import AVFoundation
 import VideoToolbox
 import CoreFoundation
 
+#if os(iOS)
+import UIKit
+#endif
+
 protocol VideoEncoderDelegate: class {
     func didSetFormatDescription(video formatDescription: CMFormatDescription?)
     func sampleOutput(video sampleBuffer: CMSampleBuffer)
@@ -282,7 +286,7 @@ final class H264Encoder: NSObject {
         guard
             let userInfo: [AnyHashable: Any] = notification.userInfo,
             let value: NSNumber = userInfo[AVAudioSessionInterruptionTypeKey] as? NSNumber,
-            let type: AVAudioSessionInterruptionType = AVAudioSessionInterruptionType(rawValue: value.uintValue) else {
+            let type: AVAudioSession.InterruptionType = AVAudioSession.InterruptionType(rawValue: value.uintValue) else {
             return
         }
         switch type {
@@ -304,13 +308,13 @@ extension H264Encoder: Running {
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(self.didAudioSessionInterruption),
-                name: .AVAudioSessionInterruption,
+                name: AVAudioSession.interruptionNotification,
                 object: nil
             )
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(self.applicationWillEnterForeground),
-                name: .UIApplicationWillEnterForeground,
+                name: UIApplication.willEnterForegroundNotification,
                 object: nil
             )
 #endif

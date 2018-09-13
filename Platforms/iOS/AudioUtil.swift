@@ -23,7 +23,7 @@ final class AudioUtil {
         #if !(arch(i386) || arch(x86_64))
             let session: AVAudioSession = AVAudioSession.sharedInstance()
             do {
-                try session.setCategory(AVAudioSessionCategoryPlayback)
+//                try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
                 try session.setActive(true)
             } catch {
             }

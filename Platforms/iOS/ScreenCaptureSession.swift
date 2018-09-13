@@ -36,7 +36,7 @@ open class ScreenCaptureSession: NSObject {
     private var shared: UIApplication?
     private var viewToCapture: UIView?
     public var afterScreenUpdates: Bool = false
-    private var context: CIContext = CIContext(options: [kCIContextUseSoftwareRenderer: NSNumber(value: false)])
+    private var context: CIContext = CIContext(options: [CIContextOption.useSoftwareRenderer: NSNumber(value: false)])
     private let semaphore = DispatchSemaphore(value: 1)
     private let lockQueue = DispatchQueue(
         label: "com.haishinkit.HaishinKit.ScreenCaptureSession.lock", qos: .userInteractive, attributes: []
@@ -133,7 +133,7 @@ open class ScreenCaptureSession: NSObject {
         let image: UIImage = UIGraphicsGetImageFromCurrentImageContext()!
         UIGraphicsEndImageContext()
         context.render(CIImage(cgImage: image.cgImage!), to: pixelBuffer!)
-        delegate?.output(pixelBuffer: pixelBuffer!, withPresentationTime: CMTimeMakeWithSeconds(displayLink.timestamp, 1000))
+        delegate?.output(pixelBuffer: pixelBuffer!, withPresentationTime: CMTimeMakeWithSeconds(displayLink.timestamp, preferredTimescale: 1000))
         CVPixelBufferUnlockBaseAddress(pixelBuffer!, [])
     }
 }
@@ -150,7 +150,7 @@ extension ScreenCaptureSession: Running {
             self.colorSpace = CGColorSpaceCreateDeviceRGB()
             self.displayLink = CADisplayLink(target: self, selector: #selector(onScreen))
             self.displayLink.frameInterval = self.frameInterval
-            self.displayLink.add(to: .main, forMode: .commonModes)
+            self.displayLink.add(to: .main, forMode: .common)
         }
     }
 
@@ -159,7 +159,7 @@ extension ScreenCaptureSession: Running {
             guard self.running else {
                 return
             }
-            self.displayLink.remove(from: .main, forMode: .commonModes)
+            self.displayLink.remove(from: .main, forMode: .common)
             self.displayLink.invalidate()
             self.colorSpace = nil
             self.displayLink = nil

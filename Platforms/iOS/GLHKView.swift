@@ -2,9 +2,9 @@ import GLKit
 import AVFoundation
 
 open class GLHKView: GLKView {
-    static let defaultOptions: [String: AnyObject] = [
-        kCIContextWorkingColorSpace: NSNull(),
-        kCIContextUseSoftwareRenderer: NSNumber(value: false)
+    static let defaultOptions: [CIContextOption: Any] = [
+        CIContextOption.workingColorSpace: NSNull(),
+        CIContextOption.useSoftwareRenderer: false
     ]
     public static var defaultBackgroundColor: UIColor = .black
     open var videoGravity: AVLayerVideoGravity = .resizeAspect
