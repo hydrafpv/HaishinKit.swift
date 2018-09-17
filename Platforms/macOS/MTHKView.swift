@@ -78,6 +78,12 @@ extension MTHKView: MTKViewDelegate {
         default:
             break
         }
+        let rpd = MTLRenderPassDescriptor()
+        rpd.colorAttachments[0].texture = drawable.texture
+        rpd.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+        rpd.colorAttachments[0].loadAction = .clear
+        commandBuffer.makeRenderCommandEncoder(descriptor: rpd)?.endEncoding()
+        
         let bounds: CGRect = CGRect(origin: .zero, size: drawableSize)
         let scaledImage: CIImage = image
             .transformed(by: CGAffineTransform(translationX: translationX, y: translationY))
