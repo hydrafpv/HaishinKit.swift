@@ -92,6 +92,10 @@ final class H264Decoder {
         }
     }
 
+    deinit {
+        session = nil
+    }
+    
     func decodeSampleBuffer(_ sampleBuffer: CMSampleBuffer) -> OSStatus {
         guard let session: VTDecompressionSession = session else {
             return kVTInvalidSessionErr
