@@ -1,12 +1,16 @@
 import MetalKit
 import AVFoundation
 
+public protocol MTHKViewDrawDelegate: class {
+    func shouldDraw(_ image: CIImage) -> Bool
+}
+
 open class MTHKView: MTKView {
     public var videoGravity: AVLayerVideoGravity = .resizeAspect
 
     var position: AVCaptureDevice.Position = .back
     var orientation: AVCaptureVideoOrientation = .portrait
-
+    
     var displayImage: CIImage?
     weak var currentStream: NetStream? {
         didSet {
@@ -15,6 +19,8 @@ open class MTHKView: MTKView {
     }
     let colorSpace: CGColorSpace = CGColorSpaceCreateDeviceRGB()
 
+    public weak var drawDelegate: MTHKViewDrawDelegate?
+    
     public init(frame: CGRect) {
         super.init(frame: frame, device: MTLCreateSystemDefaultDevice())
     }
@@ -40,6 +46,22 @@ open class MTHKView: MTKView {
         }
         currentStream = stream
     }
+    
+    private func clear() {
+        guard
+            let drawable: CAMetalDrawable = currentDrawable,
+            let commandBuffer: MTLCommandBuffer = device?.makeCommandQueue()?.makeCommandBuffer() else {
+                return
+        }
+        
+        let rpd = MTLRenderPassDescriptor()
+        rpd.colorAttachments[0].texture = drawable.texture
+        rpd.colorAttachments[0].clearColor = clearColor
+        rpd.colorAttachments[0].loadAction = .clear
+        commandBuffer.makeRenderCommandEncoder(descriptor: rpd)?.endEncoding()
+        commandBuffer.present(drawable)
+        commandBuffer.commit()
+    }
 }
 
 extension MTHKView: MTKViewDelegate {
@@ -55,6 +77,11 @@ extension MTHKView: MTKViewDelegate {
             let context: CIContext = currentStream?.mixer.videoIO.context else {
             return
         }
+        
+        if let draw = drawDelegate?.shouldDraw(image), !draw {
+            return
+        }
+        
         var scaleX: CGFloat = 0
         var scaleY: CGFloat = 0
         var translationX: CGFloat = 0
@@ -80,7 +107,7 @@ extension MTHKView: MTKViewDelegate {
         }
         let rpd = MTLRenderPassDescriptor()
         rpd.colorAttachments[0].texture = drawable.texture
-        rpd.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+        rpd.colorAttachments[0].clearColor = clearColor
         rpd.colorAttachments[0].loadAction = .clear
         commandBuffer.makeRenderCommandEncoder(descriptor: rpd)?.endEncoding()
         
