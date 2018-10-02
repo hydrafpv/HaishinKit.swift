@@ -12,13 +12,13 @@ final class RTMPMuxer {
 
     weak var delegate: RTMPMuxerDelegate?
     private var configs: [Int: Data] = [:]
-    private var audioTimestamp: CMTime = CMTime.zero
-    private var videoTimestamp: CMTime = CMTime.zero
+    private var audioTimestamp: CMTime = kCMTimeZero
+    private var videoTimestamp: CMTime = kCMTimeZero
 
     func dispose() {
         configs.removeAll()
-        audioTimestamp = CMTime.zero
-        videoTimestamp = CMTime.zero
+        audioTimestamp = kCMTimeZero
+        videoTimestamp = kCMTimeZero
     }
 }
 
@@ -33,14 +33,13 @@ extension RTMPMuxer: AudioEncoderDelegate {
         delegate?.sampleOutput(audio: buffer, withTimestamp: 0, muxer: self)
     }
 
-    func sampleOutput(audio sampleBuffer: CMSampleBuffer) {
-        let presentationTimeStamp: CMTime = sampleBuffer.presentationTimeStamp
-        let delta: Double = (audioTimestamp == CMTime.zero ? 0 : presentationTimeStamp.seconds - audioTimestamp.seconds) * 1000
-        guard let data: Data = sampleBuffer.dataBuffer?.data, 0 <= delta else {
+    func sampleOutput(audio bytes: UnsafeMutablePointer<UInt8>?, count: UInt32, presentationTimeStamp: CMTime) {
+        let delta: Double = (audioTimestamp == kCMTimeZero ? 0 : presentationTimeStamp.seconds - audioTimestamp.seconds) * 1000
+        guard let bytes = bytes, 0 <= delta else {
             return
         }
         var buffer: Data = Data([RTMPMuxer.aac, FLVAACPacketType.raw.rawValue])
-        buffer.append(data)
+        buffer.append(bytes, count: Int(count))
         delegate?.sampleOutput(audio: buffer, withTimestamp: delta, muxer: self)
         audioTimestamp = presentationTimeStamp
     }
@@ -64,12 +63,12 @@ extension RTMPMuxer: VideoEncoderDelegate {
         var compositionTime: Int32 = 0
         let presentationTimeStamp: CMTime = sampleBuffer.presentationTimeStamp
         var decodeTimeStamp: CMTime = sampleBuffer.decodeTimeStamp
-        if decodeTimeStamp == CMTime.invalid {
+        if decodeTimeStamp == kCMTimeInvalid {
             decodeTimeStamp = presentationTimeStamp
         } else {
             compositionTime = Int32((decodeTimeStamp.seconds - decodeTimeStamp.seconds) * 1000)
         }
-        let delta: Double = (videoTimestamp == CMTime.zero ? 0 : decodeTimeStamp.seconds - videoTimestamp.seconds) * 1000
+        let delta: Double = (videoTimestamp == kCMTimeZero ? 0 : decodeTimeStamp.seconds - videoTimestamp.seconds) * 1000
         guard let data = sampleBuffer.dataBuffer?.data, 0 <= delta else {
             return
         }

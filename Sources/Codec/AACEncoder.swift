@@ -2,7 +2,7 @@ import AVFoundation
 
 protocol AudioEncoderDelegate: class {
     func didSetFormatDescription(audio formatDescription: CMFormatDescription?)
-    func sampleOutput(audio sampleBuffer: CMSampleBuffer)
+    func sampleOutput(audio bytes: UnsafeMutablePointer<UInt8>?, count: UInt32, presentationTimeStamp: CMTime)
 }
 
 // MARK: -
@@ -70,7 +70,7 @@ final class AACEncoder: NSObject {
     var inClassDescriptions: [AudioClassDescription] = AACEncoder.defaultInClassDescriptions
     var formatDescription: CMFormatDescription? {
         didSet {
-            if !CMFormatDescriptionEqual(formatDescription, otherFormatDescription: oldValue) {
+            if !CMFormatDescriptionEqual(formatDescription, oldValue) {
                 delegate?.didSetFormatDescription(audio: formatDescription)
             }
         }
@@ -108,7 +108,7 @@ final class AACEncoder: NSObject {
                     mReserved: 0
                 )
                 CMAudioFormatDescriptionCreate(
-                    allocator: kCFAllocatorDefault, asbd: &_inDestinationFormat!, layoutSize: 0, layout: nil, magicCookieSize: 0, magicCookie: nil, extensions: nil, formatDescriptionOut: &formatDescription
+                    kCFAllocatorDefault, &_inDestinationFormat!, 0, nil, 0, nil, nil, &formatDescription
                 )
             }
             return _inDestinationFormat!
@@ -163,13 +163,13 @@ final class AACEncoder: NSObject {
         currentBufferList = AudioBufferList.allocate(maximumBuffers: maximumBuffers)
         CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
             sampleBuffer,
-            bufferListSizeNeededOut: nil,
-            bufferListOut: currentBufferList!.unsafeMutablePointer,
-            bufferListSize: bufferListSize,
-            blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: 0,
-            blockBufferOut: &blockBuffer
+            nil,
+            currentBufferList!.unsafeMutablePointer,
+            bufferListSize,
+            kCFAllocatorDefault,
+            kCFAllocatorDefault,
+            0,
+            &blockBuffer
         )
 
         if blockBuffer == nil {
@@ -205,12 +205,11 @@ final class AACEncoder: NSObject {
             switch status {
             // kAudioConverterErr_InvalidInputSize: perhaps mistake. but can support macOS BuiltIn Mic #61
             case noErr, kAudioConverterErr_InvalidInputSize:
-                var result: CMSampleBuffer?
-                var timing: CMSampleTimingInfo = CMSampleTimingInfo(sampleBuffer: sampleBuffer)
-                let numSamples: CMItemCount = sampleBuffer.numSamples
-                CMSampleBufferCreate(allocator: kCFAllocatorDefault, dataBuffer: nil, dataReady: false, makeDataReadyCallback: nil, refcon: nil, formatDescription: formatDescription, sampleCount: numSamples, sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &result)
-                CMSampleBufferSetDataBufferFromAudioBufferList(result!, blockBufferAllocator: kCFAllocatorDefault, blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: outOutputData.unsafePointer)
-                delegate?.sampleOutput(audio: result!)
+                delegate?.sampleOutput(
+                    audio: outOutputData[0].mData?.assumingMemoryBound(to: UInt8.self),
+                    count: outOutputData[0].mDataByteSize,
+                    presentationTimeStamp: sampleBuffer.presentationTimeStamp
+                )
             case -1:
                 finished = true
             default:
