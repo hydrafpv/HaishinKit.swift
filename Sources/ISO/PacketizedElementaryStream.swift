@@ -194,7 +194,7 @@ struct PacketizedElementaryStream: PESPacketHeader {
         optionalPESHeader?.setTimestamp(
             timestamp,
             presentationTimeStamp: presentationTimeStamp,
-            decodeTimeStamp: kCMTimeInvalid
+            decodeTimeStamp: CMTime.invalid
         )
         let length = data.count + optionalPESHeader!.data.count
         if length < Int(UInt16.max) {
