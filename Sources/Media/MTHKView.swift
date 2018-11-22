@@ -5,34 +5,43 @@ public protocol MTHKViewDrawDelegate: class {
     func shouldDraw(_ image: CIImage) -> Bool
 }
 
+@available(iOS 9.0, *)
 open class MTHKView: MTKView {
     public var videoGravity: AVLayerVideoGravity = .resizeAspect
 
     var position: AVCaptureDevice.Position = .back
     var orientation: AVCaptureVideoOrientation = .portrait
     
-    var displayImage: CIImage?
-    weak var currentStream: NetStream? {
+    private var displayImage: CIImage?
+    private weak var currentStream: NetStream? {
         didSet {
             oldValue?.mixer.videoIO.drawable = nil
         }
     }
-    let colorSpace: CGColorSpace = CGColorSpaceCreateDeviceRGB()
+    private let colorSpace: CGColorSpace = CGColorSpaceCreateDeviceRGB()
 
     public weak var drawDelegate: MTHKViewDrawDelegate?
     
     public init(frame: CGRect) {
         super.init(frame: frame, device: MTLCreateSystemDefaultDevice())
+        configure()
     }
 
     required public init(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         self.device = MTLCreateSystemDefaultDevice()
+        configure()
     }
 
     open override func awakeFromNib() {
+        configure()
+    }
+    
+    private func configure() {
         delegate = self
+        isPaused = true
         enableSetNeedsDisplay = true
+        framebufferOnly = false
     }
 
     open func attachStream(_ stream: NetStream?) {
@@ -48,32 +57,37 @@ open class MTHKView: MTKView {
     }
     
     private func clear() {
+        #if !targetEnvironment(simulator)
         guard
-            let drawable: CAMetalDrawable = currentDrawable,
+            let drawable = currentDrawable,
+            let rpd = currentRenderPassDescriptor,
             let commandBuffer: MTLCommandBuffer = device?.makeCommandQueue()?.makeCommandBuffer() else {
                 return
         }
         
-        let rpd = MTLRenderPassDescriptor()
         rpd.colorAttachments[0].texture = drawable.texture
         rpd.colorAttachments[0].clearColor = clearColor
         rpd.colorAttachments[0].loadAction = .clear
         commandBuffer.makeRenderCommandEncoder(descriptor: rpd)?.endEncoding()
         commandBuffer.present(drawable)
         commandBuffer.commit()
+        #endif
     }
 }
 
+@available(iOS 9.0, *)
 extension MTHKView: MTKViewDelegate {
     // MARK: MTKViewDelegate
     public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
     }
 
     public func draw(in view: MTKView) {
+        #if !targetEnvironment(simulator)
         guard
             let drawable: CAMetalDrawable = currentDrawable,
             let image: CIImage = displayImage,
             let commandBuffer: MTLCommandBuffer = device?.makeCommandQueue()?.makeCommandBuffer(),
+            let rpd = currentRenderPassDescriptor,
             let context: CIContext = currentStream?.mixer.videoIO.context else {
             return
         }
@@ -105,7 +119,7 @@ extension MTHKView: MTKViewDelegate {
         default:
             break
         }
-        let rpd = MTLRenderPassDescriptor()
+        
         rpd.colorAttachments[0].texture = drawable.texture
         rpd.colorAttachments[0].clearColor = clearColor
         rpd.colorAttachments[0].loadAction = .clear
@@ -118,15 +132,21 @@ extension MTHKView: MTKViewDelegate {
         context.render(scaledImage, to: drawable.texture, commandBuffer: commandBuffer, bounds: bounds, colorSpace: colorSpace)
         commandBuffer.present(drawable)
         commandBuffer.commit()
+        #endif
     }
 }
 
+@available(iOS 9.0, *)
 extension MTHKView: NetStreamDrawable {
     // MARK: NetStreamDrawable
     func draw(image: CIImage) {
         DispatchQueue.main.async {
             self.displayImage = image
+            #if os(iOS)
+            self.setNeedsDisplay()
+            #else
             self.needsDisplay = true
+            #endif
         }
     }
 }
