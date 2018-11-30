@@ -1,7 +1,11 @@
 import CoreMedia
 import Foundation
 
-final class TSWriter {
+public protocol TSWriterDelegate: class {
+    func didOutput(_ data: Data)
+}
+
+public class TSWriter {
     static let defaultPATPID: UInt16 = 0
     static let defaultPMTPID: UInt16 = 4095
     static let defaultVideoPID: UInt16 = 256
@@ -33,14 +37,17 @@ final class TSWriter {
     var segmentMaxCount: Int = TSWriter.defaultSegmentMaxCount
     var segmentDuration: Double = TSWriter.defaultSegmentDuration
 
+    public weak var delegate: TSWriterDelegate?
+
     private(set) var PAT: ProgramAssociationSpecific = {
         let PAT: ProgramAssociationSpecific = ProgramAssociationSpecific()
         PAT.programs = [1: TSWriter.defaultPMTPID]
         return PAT
     }()
+
     private(set) var PMT: ProgramMapSpecific = ProgramMapSpecific()
     private(set) var files: [M3UMediaInfo] = []
-    private(set) var running: Bool = false
+    private(set) public var isRunning: Bool = false
     private var PCRPID: UInt16 = TSWriter.defaultVideoPID
     private var sequence: Int = 0
     private var timestamps: [UInt16: CMTime] = [: ]
@@ -51,6 +58,9 @@ final class TSWriter {
     private var rotatedTimestamp: CMTime = CMTime.zero
     private var currentFileHandle: FileHandle?
     private var continuityCounters: [UInt16: UInt8] = [: ]
+
+    public init() {
+    }
 
     func getFilePath(_ fileName: String) -> String? {
         return files.first {
@@ -88,11 +98,13 @@ final class TSWriter {
         }
 
         nstry({
+            self.delegate?.didOutput(bytes)
             self.currentFileHandle?.write(bytes)
         }, { exception in
             self.currentFileHandle?.write(bytes)
             logger.warn("\(exception)")
-        })    }
+        })
+    }
 
     func writeSampleBuffer(_ PID: UInt16, streamID: UInt8, sampleBuffer: CMSampleBuffer) {
         let presentationTimeStamp: CMTime = sampleBuffer.presentationTimeStamp
@@ -134,6 +146,7 @@ final class TSWriter {
         }
 
         nstry({
+            self.delegate?.didOutput(bytes)
             self.currentFileHandle?.write(bytes)
         }, { exception in
             self.currentFileHandle?.write(bytes)
@@ -219,6 +232,7 @@ final class TSWriter {
         }
 
         nstry({
+            self.delegate?.didOutput(bytes)
             self.currentFileHandle?.write(bytes)
         }, { exception in
             logger.warn("\(exception)")
@@ -243,23 +257,24 @@ final class TSWriter {
 
 extension TSWriter: Running {
     // MARK: Running
-    func startRunning() {
+    public func startRunning() {
         lockQueue.async {
-            guard self.running else {
+            guard self.isRunning else {
                 return
             }
-            self.running = true
+            self.isRunning = true
         }
     }
-    func stopRunning() {
+
+    public func stopRunning() {
         lockQueue.async {
-            guard !self.running else {
+            guard !self.isRunning else {
                 return
             }
             self.currentFileURL = nil
             self.currentFileHandle = nil
             self.removeFiles()
-            self.running = false
+            self.isRunning = false
         }
     }
 }

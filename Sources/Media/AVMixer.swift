@@ -87,13 +87,14 @@ final public class AVMixer: NSObject {
 }
 
 extension AVMixer {
-    final func startEncoding(delegate: Any) {
+    final public func startEncoding(delegate: Any) {
         videoIO.encoder.delegate = delegate as? VideoEncoderDelegate
         videoIO.encoder.startRunning()
         audioIO.encoder.delegate = delegate as? AudioEncoderDelegate
         audioIO.encoder.startRunning()
     }
-    final func stopEncoding() {
+
+    final public func stopEncoding() {
         videoIO.encoder.delegate = nil
         videoIO.encoder.stopRunning()
         audioIO.encoder.delegate = nil
@@ -102,11 +103,12 @@ extension AVMixer {
 }
 
 extension AVMixer {
-    final func startPlaying() {
+    final public func startPlaying() {
         audioIO.playback.startRunning()
         videoIO.queue.startRunning()
     }
-    final func stopPlaying() {
+
+    final public func stopPlaying() {
         audioIO.playback.stopRunning()
         videoIO.queue.stopRunning()
     }
@@ -115,12 +117,12 @@ extension AVMixer {
 #if os(iOS) || os(macOS)
 extension AVMixer: Running {
     // MARK: Running
-    var running: Bool {
+    public var isRunning: Bool {
         return session.isRunning
     }
 
-    final func startRunning() {
-        guard !running else {
+    final public func startRunning() {
+        guard !isRunning else {
             return
         }
         DispatchQueue.global(qos: .userInteractive).async {
@@ -128,8 +130,8 @@ extension AVMixer: Running {
         }
     }
 
-    final func stopRunning() {
-        guard running else {
+    final public func stopRunning() {
+        guard isRunning else {
             return
         }
         session.stopRunning()
@@ -138,12 +140,14 @@ extension AVMixer: Running {
 #else
 extension AVMixer: Running {
     // MARK: Running
-    var running: Bool {
+    public var isRunning: Bool {
         return false
     }
-    final func startRunning() {
+
+    final public func startRunning() {
     }
-    final func stopRunning() {
+
+    final public func stopRunning() {
     }
 }
 #endif
