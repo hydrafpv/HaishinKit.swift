@@ -1,4 +1,4 @@
-# HaishinKit (formerly lf)
+﻿# HaishinKit (formerly lf)
 [![Platform](https://img.shields.io/cocoapods/p/HaishinKit.svg?style=flat)](http://cocoapods.org/pods/HaishinKit)
 ![Language](https://img.shields.io/badge/language-Swift%204.0-orange.svg)
 [![CocoaPods](https://img.shields.io/cocoapods/v/HaishinKit.svg?style=flat)](http://cocoapods.org/pods/HaishinKit)
@@ -20,8 +20,8 @@
   - [ ] AMF3
 - [x] SharedObject
 - [x] RTMPS
-  - [x] Native (RTMP over SSL/TSL)
-  - [x] _Tunneled (RTMPT over SSL/TSL) (Technical Preview)_
+  - [x] Native (RTMP over SSL/TLS)
+  - [x] _Tunneled (RTMPT over SSL/TLS) (Technical Preview)_
 - [x] _RTMPT (Technical Preview)_
 - [x] _ReplayKit Live as a Broadcast Upload Extension (Technical Preview)_
 
@@ -73,7 +73,7 @@ source 'https://github.com/CocoaPods/Specs.git'
 use_frameworks!
 
 def import_pods
-    pod 'HaishinKit', '~> 0.10.3'
+    pod 'HaishinKit', '~> 0.10.5'
 end
 
 target 'Your Target'  do
@@ -83,7 +83,7 @@ end
 ```
 ### Carthage
 ```
-github "shogo4405/HaishinKit.swift" ~> 0.10.3
+github "shogo4405/HaishinKit.swift" ~> 0.10.5
 ```
 
 ## License
@@ -102,12 +102,12 @@ Bitcoin
 Make sure you setup and activate your AVAudioSession.
 ```swift
 import AVFoundation
-let session: AVAudioSession = AVAudioSession.sharedInstance()
+let session = AVAudioSession.sharedInstance()
 do {
     try session.setPreferredSampleRate(44_100)
     // https://stackoverflow.com/questions/51010390/avaudiosession-setcategory-swift-4-2-ios-12-play-sound-on-silent
     if #available(iOS 10.0, *) {
-        try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
+        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
     } else {
         session.perform(NSSelectorFromString("setCategory:withOptions:error:"), with: AVAudioSession.Category.playAndRecord, with:  [AVAudioSession.CategoryOptions.allowBluetooth])
     }
@@ -119,8 +119,8 @@ do {
 ## RTMP Usage
 Real Time Messaging Protocol (RTMP).
 ```swift
-let rtmpConnection:RTMPConnection = RTMPConnection()
-let rtmpStream: RTMPStream = RTMPStream(connection: rtmpConnection)
+let rtmpConnection = RTMPConnection()
+let rtmpStream = RTMPStream(connection: rtmpConnection)
 rtmpStream.attachAudio(AVCaptureDevice.default(for: AVMediaType.audio)) { error in
     // print(error)
 }
@@ -147,7 +147,7 @@ let sampleRate:Double = 44_100
 
 // see: #58
 #if(iOS)
-let session: AVAudioSession = AVAudioSession.sharedInstance()
+let session = AVAudioSession.sharedInstance()
 do {
     try session.setPreferredSampleRate(44_100)
     // https://stackoverflow.com/questions/51010390/avaudiosession-setcategory-swift-4-2-ios-12-play-sound-on-silent
@@ -210,7 +210,7 @@ rtmpStream.attachAudio(AVCaptureDevice.default(for: AVMediaType.audio), automati
 ```
 ### Authentication
 ```swift
-var rtmpConnection:RTMPConnection = RTMPConnection()
+var rtmpConnection = RTMPConnection()
 rtmpConnection.connect("rtmp://username:password@localhost/appName/instanceName")
 ```
 
@@ -225,15 +225,15 @@ rtmpStream.attachScreen(AVCaptureScreenInput(displayID: CGMainDisplayID()))
 ## HTTP Usage
 HTTP Live Streaming (HLS). Your iPhone/Mac become a IP Camera. Basic snipet. You can see http://ip.address:8080/hello/playlist.m3u8 
 ```swift
-var httpStream:HTTPStream = HTTPStream()
+var httpStream = HTTPStream()
 httpStream.attachCamera(DeviceUtil.device(withPosition: .back))
 httpStream.attachAudio(AVCaptureDevice.defaultDevice(withMediaType: AVMediaTypeAudio))
 httpStream.publish("hello")
 
-var hjView = HKView(frame: view.bounds)
+var hkView = HKView(frame: view.bounds)
 hkView.attachStream(httpStream)
 
-var httpService:HLSService = HLSService(domain: "", type: "_http._tcp", name: "lf", port: 8080)
+var httpService = HLSService(domain: "", type: "_http._tcp", name: "HaishinKit", port: 8080)
 httpService.startRunning()
 httpService.addHTTPStream(httpStream)
 

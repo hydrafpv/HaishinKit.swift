@@ -1,6 +1,6 @@
 import AVFoundation
-import VideoToolbox
 import CoreFoundation
+import VideoToolbox
 
 #if os(iOS)
 import UIKit
@@ -135,8 +135,8 @@ final class H264Encoder: NSObject {
     }
     weak var delegate: VideoEncoderDelegate?
 
-    internal(set) var isRunning: Bool = false
-    private var supportedProperty: [AnyHashable: Any]? = nil {
+    private(set) var isRunning: Bool = false
+    private var supportedProperty: [AnyHashable: Any]? {
         didSet {
             guard logger.isEnabledFor(level: .info) else {
                 return
@@ -279,10 +279,13 @@ final class H264Encoder: NSObject {
     }
 
 #if os(iOS)
-    @objc func applicationWillEnterForeground(_ notification: Notification) {
+    @objc
+    private func applicationWillEnterForeground(_ notification: Notification) {
         invalidateSession = true
     }
-    @objc func didAudioSessionInterruption(_ notification: Notification) {
+
+    @objc
+    private func didAudioSessionInterruption(_ notification: Notification) {
         guard
             let userInfo: [AnyHashable: Any] = notification.userInfo,
             let value: NSNumber = userInfo[AVAudioSessionInterruptionTypeKey] as? NSNumber,

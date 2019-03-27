@@ -2,7 +2,7 @@ import AVFoundation
 
 open class HTTPStream: NetStream {
     private(set) var name: String?
-    private lazy var tsWriter: TSFileWriter = TSFileWriter()
+    private lazy var tsWriter = TSFileWriter()
 
     open func publish(_ name: String?) {
         lockQueue.async {
@@ -25,6 +25,7 @@ open class HTTPStream: NetStream {
         }
     }
 
+    #if os(iOS) || os(macOS)
     override open func attachCamera(_ camera: AVCaptureDevice?, onError: ((NSError) -> Void)? = nil) {
         if camera == nil {
             tsWriter.expectedMedias.remove(.video)
@@ -42,19 +43,20 @@ open class HTTPStream: NetStream {
         }
         super.attachAudio(audio, automaticallyConfiguresApplicationAudioSession: automaticallyConfiguresApplicationAudioSession, onError: onError)
     }
+    #endif
 
     func getResource(_ resourceName: String) -> (MIME, String)? {
-        let url: URL = URL(fileURLWithPath: resourceName)
+        let url = URL(fileURLWithPath: resourceName)
         guard let name: String = name, 2 <= url.pathComponents.count && url.pathComponents[1] == name else {
             return nil
         }
         let fileName: String = url.pathComponents.last!
         switch true {
         case fileName == "playlist.m3u8":
-            return (.ApplicationXMpegURL, tsWriter.playlist)
+            return (.applicationXMpegURL, tsWriter.playlist)
         case fileName.contains(".ts"):
             if let mediaFile: String = tsWriter.getFilePath(fileName) {
-                return (.VideoMP2T, mediaFile)
+                return (.videoMP2T, mediaFile)
             }
             return nil
         default:

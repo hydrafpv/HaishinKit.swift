@@ -1,17 +1,18 @@
 import AVFoundation
 
-public protocol AVMixerRecorderDelegate: class {
+public protocol AVRecorderDelegate: class {
     var moviesDirectory: URL { get }
-    func rotateFile(_ recorder: AVMixerRecorder, withPresentationTimeStamp: CMTime, mediaType: AVMediaType)
-    func getPixelBufferAdaptor(_ recorder: AVMixerRecorder, withWriterInput: AVAssetWriterInput?) -> AVAssetWriterInputPixelBufferAdaptor?
-    func getWriterInput(_ recorder: AVMixerRecorder, mediaType: AVMediaType, sourceFormatHint: CMFormatDescription?) -> AVAssetWriterInput?
-    func didStartRunning(_ recorder: AVMixerRecorder)
-    func didStopRunning(_ recorder: AVMixerRecorder)
-    func didFinishWriting(_ recorder: AVMixerRecorder)
+
+    func rotateFile(_ recorder: AVRecorder, withPresentationTimeStamp: CMTime, mediaType: AVMediaType)
+    func getPixelBufferAdaptor(_ recorder: AVRecorder, withWriterInput: AVAssetWriterInput?) -> AVAssetWriterInputPixelBufferAdaptor?
+    func getWriterInput(_ recorder: AVRecorder, mediaType: AVMediaType, sourceFormatHint: CMFormatDescription?) -> AVAssetWriterInput?
+    func didStartRunning(_ recorder: AVRecorder)
+    func didStopRunning(_ recorder: AVRecorder)
+    func didFinishWriting(_ recorder: AVRecorder)
 }
 
 // MARK: -
-open class AVMixerRecorder: NSObject {
+open class AVRecorder: NSObject {
 
     public static let defaultOutputSettings: [AVMediaType: [String: Any]] = [
         .audio: [
@@ -28,13 +29,13 @@ open class AVMixerRecorder: NSObject {
 
     open var writer: AVAssetWriter?
     open var fileName: String?
-    open weak var delegate: AVMixerRecorderDelegate?
+    open weak var delegate: AVRecorderDelegate?
     open var writerInputs: [AVMediaType: AVAssetWriterInput] = [:]
-    open var outputSettings: [AVMediaType: [String: Any]] = AVMixerRecorder.defaultOutputSettings
+    open var outputSettings: [AVMediaType: [String: Any]] = AVRecorder.defaultOutputSettings
     open var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
-    public let lockQueue = DispatchQueue(label: "com.haishinkit.HaishinKit.AVMixerRecorder.lock")
-    private(set) public var isRunning: Bool = false
-    fileprivate(set) var sourceTime: CMTime = CMTime.zero
+    public let lockQueue = DispatchQueue(label: "com.haishinkit.HaishinKit.AVRecorder.lock")
+    public private(set) var isRunning: Bool = false
+    fileprivate(set) var sourceTime = CMTime.zero
 
     var isReadyForStartWriting: Bool {
         guard let writer: AVAssetWriter = writer else {
@@ -43,14 +44,14 @@ open class AVMixerRecorder: NSObject {
         return outputSettings.count == writer.inputs.count
     }
 
-    public override init() {
+    override public init() {
         super.init()
-        delegate = DefaultAVMixerRecorderDelegate()
+        delegate = DefaultAVRecorderDelegate()
     }
 
     final func appendSampleBuffer(_ sampleBuffer: CMSampleBuffer, mediaType: AVMediaType) {
         lockQueue.async {
-            guard let delegate: AVMixerRecorderDelegate = self.delegate, self.isRunning else {
+            guard let delegate: AVRecorderDelegate = self.delegate, self.isRunning else {
                 return
             }
 
@@ -79,7 +80,7 @@ open class AVMixerRecorder: NSObject {
 
     final func appendPixelBuffer(_ pixelBuffer: CVPixelBuffer, withPresentationTime: CMTime) {
         lockQueue.async {
-            guard let delegate: AVMixerRecorderDelegate = self.delegate, self.isRunning else {
+            guard let delegate: AVRecorderDelegate = self.delegate, self.isRunning else {
                 return
             }
 
@@ -122,9 +123,9 @@ open class AVMixerRecorder: NSObject {
     }
 }
 
-extension AVMixerRecorder: Running {
+extension AVRecorder: Running {
     // MARK: Running
-    final public func startRunning() {
+    public func startRunning() {
         lockQueue.async {
             guard !self.isRunning else {
                 return
@@ -134,7 +135,7 @@ extension AVMixerRecorder: Running {
         }
     }
 
-    final public func stopRunning() {
+    public func stopRunning() {
         lockQueue.async {
             guard self.isRunning else {
                 return
@@ -147,28 +148,28 @@ extension AVMixerRecorder: Running {
 }
 
 // MARK: -
-open class DefaultAVMixerRecorderDelegate: NSObject {
+open class DefaultAVRecorderDelegate: NSObject {
     open var duration: Int64 = 0
     open var dateFormat: String = "-yyyyMMdd-HHmmss"
 
-    private var rotateTime: CMTime = CMTime.zero
+    private var rotateTime = CMTime.zero
     private var clockReference: AVMediaType = .video
 
     #if os(iOS)
     open lazy var moviesDirectory: URL = {
-        return URL(fileURLWithPath: NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0])
+        URL(fileURLWithPath: NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0])
     }()
     #else
     open lazy var moviesDirectory: URL = {
-        return URL(fileURLWithPath: NSSearchPathForDirectoriesInDomains(.moviesDirectory, .userDomainMask, true)[0])
+        URL(fileURLWithPath: NSSearchPathForDirectoriesInDomains(.moviesDirectory, .userDomainMask, true)[0])
     }()
     #endif
 }
 
 @objc
-extension DefaultAVMixerRecorderDelegate: AVMixerRecorderDelegate {
-    // MARK: AVMixerRecorderDelegate
-    open func rotateFile(_ recorder: AVMixerRecorder, withPresentationTimeStamp: CMTime, mediaType: AVMediaType) {
+extension DefaultAVRecorderDelegate: AVRecorderDelegate {
+    // MARK: AVRecorderDelegate
+    open func rotateFile(_ recorder: AVRecorder, withPresentationTimeStamp: CMTime, mediaType: AVMediaType) {
         guard clockReference == mediaType && rotateTime.value < withPresentationTimeStamp.value else {
             return
         }
@@ -183,7 +184,7 @@ extension DefaultAVMixerRecorderDelegate: AVMixerRecorderDelegate {
         recorder.sourceTime = withPresentationTimeStamp
     }
 
-    open func getPixelBufferAdaptor(_ recorder: AVMixerRecorder, withWriterInput: AVAssetWriterInput?) -> AVAssetWriterInputPixelBufferAdaptor? {
+    open func getPixelBufferAdaptor(_ recorder: AVRecorder, withWriterInput: AVAssetWriterInput?) -> AVAssetWriterInputPixelBufferAdaptor? {
         guard recorder.pixelBufferAdaptor == nil else {
             return recorder.pixelBufferAdaptor
         }
@@ -195,7 +196,7 @@ extension DefaultAVMixerRecorderDelegate: AVMixerRecorderDelegate {
         return adaptor
     }
 
-    open func getWriterInput(_ recorder: AVMixerRecorder, mediaType: AVMediaType, sourceFormatHint: CMFormatDescription?) -> AVAssetWriterInput? {
+    open func getWriterInput(_ recorder: AVRecorder, mediaType: AVMediaType, sourceFormatHint: CMFormatDescription?) -> AVAssetWriterInput? {
         guard recorder.writerInputs[mediaType] == nil else {
             return recorder.writerInputs[mediaType]
         }
@@ -238,7 +239,7 @@ extension DefaultAVMixerRecorderDelegate: AVMixerRecorderDelegate {
             }
         }
 
-        let input: AVAssetWriterInput = AVAssetWriterInput(mediaType: mediaType, outputSettings: outputSettings, sourceFormatHint: sourceFormatHint)
+        let input = AVAssetWriterInput(mediaType: mediaType, outputSettings: outputSettings, sourceFormatHint: sourceFormatHint)
         input.expectsMediaDataInRealTime = true
         recorder.writerInputs[mediaType] = input
         recorder.writer?.add(input)
@@ -246,19 +247,19 @@ extension DefaultAVMixerRecorderDelegate: AVMixerRecorderDelegate {
         return input
     }
 
-    open func didFinishWriting(_ recorder: AVMixerRecorder) {
+    open func didFinishWriting(_ recorder: AVRecorder) {
     }
 
-    open func didStartRunning(_ recorder: AVMixerRecorder) {
+    open func didStartRunning(_ recorder: AVRecorder) {
     }
 
-    open func didStopRunning(_ recorder: AVMixerRecorder) {
+    open func didStopRunning(_ recorder: AVRecorder) {
         rotateTime = CMTime.zero
     }
 
     func createWriter(_ fileName: String?) -> AVAssetWriter? {
         do {
-            let dateFormatter: DateFormatter = DateFormatter()
+            let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US")
             dateFormatter.dateFormat = dateFormat
             var fileComponent: String?

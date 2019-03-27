@@ -18,32 +18,38 @@ final class VideoIOComponent: IOComponent {
     let lockQueue = DispatchQueue(label: "com.haishinkit.HaishinKit.VideoIOComponent.lock")
     var context: CIContext? {
         didSet {
-            objc_sync_enter(effects)
-            defer {
-                objc_sync_exit(effects)
-            }
             for effect in effects {
                 effect.ciContext = context
             }
         }
     }
-    var drawable: NetStreamDrawable?
+
+    #if os(iOS) || os(macOS)
+    var drawable: NetStreamDrawable? = nil {
+        didSet {
+            drawable?.orientation = orientation
+        }
+    }
+    #else
+    var drawable: NetStreamDrawable? = nil
+    #endif
+
     var formatDescription: CMVideoFormatDescription? {
         didSet {
             decoder.formatDescription = formatDescription
         }
     }
-    lazy var encoder: H264Encoder = H264Encoder()
-    lazy var decoder: H264Decoder = H264Decoder()
+    lazy var encoder = H264Encoder()
+    lazy var decoder = H264Decoder()
     lazy var queue: DisplayLinkedQueue = {
-        let queue: DisplayLinkedQueue = DisplayLinkedQueue()
+        let queue = DisplayLinkedQueue()
         queue.delegate = self
         return queue
     }()
 
     private(set) var effects: Set<VisualEffect> = []
 
-    private var extent: CGRect = CGRect.zero {
+    private var extent = CGRect.zero {
         didSet {
             guard extent != oldValue else {
                 return
@@ -108,6 +114,7 @@ final class VideoIOComponent: IOComponent {
 
     var orientation: AVCaptureVideoOrientation = .portrait {
         didSet {
+            drawable?.orientation = orientation
             guard orientation != oldValue else {
                 return
             }
@@ -117,7 +124,6 @@ final class VideoIOComponent: IOComponent {
                     setTorchMode(.on)
                 }
             }
-            drawable?.orientation = orientation
         }
     }
 
@@ -270,6 +276,8 @@ final class VideoIOComponent: IOComponent {
         #if os(iOS)
         if let orientation: AVCaptureVideoOrientation = DeviceUtil.videoOrientation(by: UIDevice.current.orientation) {
             self.orientation = orientation
+        } else if let defaultOrientation = RTMPStream.defaultOrientation {
+            self.orientation = defaultOrientation
         }
         #endif
     }
@@ -322,6 +330,7 @@ final class VideoIOComponent: IOComponent {
             logger.error("while setting torch: \(error)")
         }
     }
+
     func dispose() {
         if Thread.isMainThread {
             self.drawable?.attachStream(nil)
@@ -384,11 +393,12 @@ final class VideoIOComponent: IOComponent {
             duration: sampleBuffer.duration
         )
 
-        mixer?.recorder.appendSampleBuffer(sampleBuffer, mediaType: .video)
+        mixer?.recorder.appendPixelBuffer(imageBuffer ?? buffer, withPresentationTime: sampleBuffer.presentationTimeStamp)
     }
 
+    @inline(__always)
     func effect(_ buffer: CVImageBuffer, info: CMSampleBuffer?) -> CIImage {
-        var image: CIImage = CIImage(cvPixelBuffer: buffer)
+        var image = CIImage(cvPixelBuffer: buffer)
         for effect in effects {
             image = effect.execute(image, info: info)
         }
@@ -396,19 +406,11 @@ final class VideoIOComponent: IOComponent {
     }
 
     func registerEffect(_ effect: VisualEffect) -> Bool {
-        objc_sync_enter(effects)
-        defer {
-            objc_sync_exit(effects)
-        }
         effect.ciContext = context
         return effects.insert(effect).inserted
     }
 
     func unregisterEffect(_ effect: VisualEffect) -> Bool {
-        objc_sync_enter(effects)
-        defer {
-            objc_sync_exit(effects)
-        }
         effect.ciContext = nil
         return effects.remove(effect) != nil
     }
@@ -431,7 +433,6 @@ extension VideoIOComponent: VideoDecoderDelegate {
 extension VideoIOComponent: DisplayLinkedQueueDelegate {
     // MARK: DisplayLinkedQueue
     func queue(_ buffer: CMSampleBuffer) {
-        mixer?.audioIO.playback.startQueueIfNeed()
         drawable?.draw(image: CIImage(cvPixelBuffer: buffer.imageBuffer!))
     }
 }

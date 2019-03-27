@@ -22,13 +22,6 @@ public struct RTMPStreamInfo {
     }
 }
 
-extension RTMPStreamInfo: CustomStringConvertible {
-    // MARK: CustomStringConvertible
-    public var description: String {
-        return Mirror(reflecting: self).description
-    }
-}
-
 // MARK: -
 /**
  flash.net.NetStream for Swift
@@ -183,17 +176,13 @@ open class RTMPStream: NetStream {
         case `switch`
     }
 
-    public struct PlayOption: CustomStringConvertible {
+    public struct PlayOption {
         public var len: Double = 0
         public var offset: Double = 0
         public var oldStreamName: String = ""
         public var start: Double = 0
         public var streamName: String = ""
         public var transition: PlayTransition = .switch
-
-        public var description: String {
-            return Mirror(reflecting: self).description
-        }
     }
 
     public enum HowToPublish: String {
@@ -206,24 +195,27 @@ open class RTMPStream: NetStream {
 
     enum ReadyState: UInt8 {
         case initialized = 0
-        case open        = 1
-        case play        = 2
-        case playing     = 3
-        case publish     = 4
-        case publishing  = 5
-        case closed      = 6
+        case open = 1
+        case play = 2
+        case playing = 3
+        case publish = 4
+        case publishing = 5
+        case closed = 6
     }
 
     static let defaultID: UInt32 = 0
-    public static let defaultAudioBitrate: UInt32 = AACEncoder.defaultBitrate
+    public static let defaultAudioBitrate: UInt32 = AudioConverter.defaultBitrate
     public static let defaultVideoBitrate: UInt32 = H264Encoder.defaultBitrate
-    weak open var delegate: RTMPStreamDelegate?
-    open internal(set) var info: RTMPStreamInfo = RTMPStreamInfo()
+    #if !os(tvOS)
+    public static var defaultOrientation: AVCaptureVideoOrientation? = nil
+    #endif
+    open weak var delegate: RTMPStreamDelegate?
+    open internal(set) var info = RTMPStreamInfo()
     open private(set) var objectEncoding: UInt8 = RTMPConnection.defaultObjectEncoding
     @objc open private(set) dynamic var currentFPS: UInt16 = 0
     open var soundTransform: SoundTransform {
-        get { return mixer.audioIO.playback.soundTransform }
-        set { mixer.audioIO.playback.soundTransform = newValue }
+        get { return mixer.audioIO.soundTransform }
+        set { mixer.audioIO.soundTransform = newValue }
     }
 
     var id: UInt32 = RTMPStream.defaultID
@@ -257,8 +249,7 @@ open class RTMPStream: NetStream {
                 info.clear()
                 delegate?.clear()
             case .playing:
-                mixer.audioIO.playback.startRunning()
-                mixer.startPlaying()
+                mixer.startPlaying(rtmpConnection.audioEngine)
             case .publish:
                 muxer.dispose()
                 muxer.delegate = self
@@ -288,7 +279,7 @@ open class RTMPStream: NetStream {
 
     var audioTimestamp: Double = 0
     var videoTimestamp: Double = 0
-    private(set) var muxer: RTMPMuxer = RTMPMuxer()
+    private(set) var muxer = RTMPMuxer()
     private var paused: Bool = false
     private var sampler: MP4Sampler?
     private var frameCount: UInt16 = 0
@@ -584,8 +575,9 @@ open class RTMPStream: NetStream {
         info.on(timer: timer)
     }
 
-    @objc private func on(status: Notification) {
-        let e: Event = Event.from(status)
+    @objc
+    private func on(status: Notification) {
+        let e = Event.from(status)
         guard let data: ASObject = e.data as? ASObject, let code: String = data["code"] as? String else {
             return
         }

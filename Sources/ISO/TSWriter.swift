@@ -1,6 +1,6 @@
+import AVFoundation
 import CoreMedia
 import Foundation
-import AVFoundation
 
 /// MPEG-2 TS (Transport Stream) Writer delegate
 public protocol TSWriterDelegate: class {
@@ -9,10 +9,11 @@ public protocol TSWriterDelegate: class {
 
 /// MPEG-2 TS (Transport Stream) Writer Foundation class
 public class TSWriter: Running {
-    static public let defaultPATPID: UInt16 = 0
-    static public let defaultPMTPID: UInt16 = 4095
-    static public let defaultVideoPID: UInt16 = 256
-    static public let defaultAudioPID: UInt16 = 257
+    public static let defaultPATPID: UInt16 = 0
+    public static let defaultPMTPID: UInt16 = 4095
+    public static let defaultVideoPID: UInt16 = 256
+    public static let defaultAudioPID: UInt16 = 257
+
     static let defaultSegmentDuration: Double = 2
 
     /// The delegate instance.
@@ -25,8 +26,10 @@ public class TSWriter: Running {
     var audioContinuityCounter: UInt8 = 0
     var videoContinuityCounter: UInt8 = 0
     var PCRPID: UInt16 = TSWriter.defaultVideoPID
-    var rotatedTimestamp: CMTime = CMTime.zero
+    var rotatedTimestamp = CMTime.zero
     var segmentDuration: Double = TSWriter.defaultSegmentDuration
+    let lockQueue = DispatchQueue(label: "com.haishinkit.HaishinKit.TSWriter.lock")
+
     private(set) var PAT: ProgramAssociationSpecific = {
         let PAT: ProgramAssociationSpecific = .init()
         PAT.programs = [1: TSWriter.defaultPMTPID]
@@ -35,17 +38,17 @@ public class TSWriter: Running {
     private(set) var PMT: ProgramMapSpecific = .init()
     private var audioConfig: AudioSpecificConfig? {
         didSet {
-            writeProgram()
+            writeProgramIfNeeded()
         }
     }
-    private var audioTimestamp: CMTime = .invalid
     private var videoConfig: AVCConfigurationRecord? {
         didSet {
-            writeProgram()
+            writeProgramIfNeeded()
         }
     }
     private var videoTimestamp: CMTime = .invalid
-    private var PCRTimestamp: CMTime = .invalid
+    private var audioTimestamp: CMTime = .invalid
+    private var PCRTimestamp = CMTime.zero
     private var canWriteFor: Bool {
         guard expectedMedias.isEmpty else { return true }
         if expectedMedias.contains(.audio) && expectedMedias.contains(.video) {
@@ -63,6 +66,31 @@ public class TSWriter: Running {
     public init() {
     }
 
+    public func startRunning() {
+        guard isRunning else {
+            return
+        }
+        isRunning = true
+    }
+
+    public func stopRunning() {
+        guard !isRunning else {
+            return
+        }
+        audioContinuityCounter = 0
+        videoContinuityCounter = 0
+        PCRPID = TSWriter.defaultVideoPID
+        PAT.programs.removeAll()
+        PAT.programs = [1: TSWriter.defaultPMTPID]
+        PMT = ProgramMapSpecific()
+        audioConfig = nil
+        videoConfig = nil
+        videoTimestamp = .invalid
+        audioTimestamp = .invalid
+        PCRTimestamp = .invalid
+        isRunning = false
+    }
+
     // swiftlint:disable function_parameter_count
     final func writeSampleBuffer(_ PID: UInt16, streamID: UInt8, bytes: UnsafePointer<UInt8>?, count: UInt32, presentationTimeStamp: CMTime, decodeTimeStamp: CMTime, randomAccessIndicator: Bool) {
         guard canWriteFor else { return }
@@ -71,15 +99,17 @@ public class TSWriter: Running {
         case TSWriter.defaultAudioPID:
             guard audioTimestamp == .invalid else { break }
             audioTimestamp = presentationTimeStamp
+            if PCRPID == PID {
+                PCRTimestamp = presentationTimeStamp
+            }
         case TSWriter.defaultVideoPID:
             guard videoTimestamp == .invalid else { break }
             videoTimestamp = presentationTimeStamp
+            if PCRPID == PID {
+                PCRTimestamp = presentationTimeStamp
+            }
         default:
             break
-        }
-
-        if PCRPID == PID {
-            PCRTimestamp = presentationTimeStamp
         }
 
         guard var PES = PacketizedElementaryStream.create(
@@ -94,11 +124,14 @@ public class TSWriter: Running {
         }
 
         PES.streamID = streamID
-        var packets: [TSPacket] = split(PID, PES: PES, timestamp: decodeTimeStamp)
-        packets[0].adaptationField?.randomAccessIndicator = randomAccessIndicator
-        rotateFileHandle(decodeTimeStamp == CMTime.invalid ? presentationTimeStamp : decodeTimeStamp)
 
-        var bytes: Data = Data()
+        let timestamp = decodeTimeStamp == .invalid ? presentationTimeStamp : decodeTimeStamp
+        var packets: [TSPacket] = split(PID, PES: PES, timestamp: timestamp)
+        rotateFileHandle(timestamp)
+
+        packets[0].adaptationField?.randomAccessIndicator = randomAccessIndicator
+
+        var bytes = Data()
         for var packet in packets {
             switch PID {
             case TSWriter.defaultAudioPID:
@@ -129,9 +162,9 @@ public class TSWriter: Running {
         delegate?.didOutput(data)
     }
 
-    func writeProgram() {
+    final func writeProgram() {
         PMT.PCRPID = PCRPID
-        var bytes: Data = Data()
+        var bytes = Data()
         var packets: [TSPacket] = []
         packets.append(contentsOf: PAT.arrayOfPackets(TSWriter.defaultPATPID))
         packets.append(contentsOf: PMT.arrayOfPackets(TSWriter.defaultPMTPID))
@@ -141,43 +174,17 @@ public class TSWriter: Running {
         write(bytes)
     }
 
-    func writeProgramIfNeeded() {
+    final func writeProgramIfNeeded() {
         guard !expectedMedias.isEmpty else { return }
         guard canWriteFor else { return }
         writeProgram()
     }
 
-    public func startRunning() {
-        guard isRunning else {
-            return
-        }
-        isRunning = true
-    }
-
-    public func stopRunning() {
-        guard !isRunning else {
-            return
-        }
-        audioContinuityCounter = 0
-        videoContinuityCounter = 0
-        PCRPID = TSWriter.defaultVideoPID
-        PAT.programs.removeAll()
-        PAT.programs = [1: TSWriter.defaultPMTPID]
-        PMT = ProgramMapSpecific()
-        audioConfig = nil
-        videoConfig = nil
-        videoTimestamp = .invalid
-        audioTimestamp = .invalid
-        PCRTimestamp = .invalid
-        isRunning = false
-    }
-
     private func split(_ PID: UInt16, PES: PacketizedElementaryStream, timestamp: CMTime) -> [TSPacket] {
-        let timestamp = PID == TSWriter.defaultVideoPID ? videoTimestamp : audioTimestamp
         var PCR: UInt64?
         let duration: Double = timestamp.seconds - PCRTimestamp.seconds
         if PCRPID == PID && 0.02 <= duration {
-            PCR = UInt64((timestamp.seconds - timestamp.seconds) * TSTimestamp.resolution)
+            PCR = UInt64((timestamp.seconds - (PID == TSWriter.defaultVideoPID ? videoTimestamp : audioTimestamp).seconds) * TSTimestamp.resolution)
             PCRTimestamp = timestamp
         }
         var packets: [TSPacket] = []
@@ -188,13 +195,13 @@ public class TSWriter: Running {
     }
 }
 
-extension TSWriter: AudioEncoderDelegate {
-    // MARK: AudioEncoderDelegate
-    func didSetFormatDescription(audio formatDescription: CMFormatDescription?) {
+extension TSWriter: AudioConverterDelegate {
+    // MARK: AudioConverterDelegate
+    public func didSetFormatDescription(audio formatDescription: CMFormatDescription?) {
         guard let formatDescription: CMAudioFormatDescription = formatDescription else {
             return
         }
-        var data: ElementaryStreamSpecificData = ElementaryStreamSpecificData()
+        var data = ElementaryStreamSpecificData()
         data.streamType = ElementaryStreamType.adtsaac.rawValue
         data.elementaryPID = TSWriter.defaultAudioPID
         PMT.elementaryStreamSpecificData.append(data)
@@ -202,14 +209,15 @@ extension TSWriter: AudioEncoderDelegate {
         audioConfig = AudioSpecificConfig(formatDescription: formatDescription)
     }
 
-    func sampleOutput(audio bytes: UnsafePointer<UInt8>?, count: UInt32, presentationTimeStamp: CMTime) {
+    public func sampleOutput(audio data: UnsafeMutableAudioBufferListPointer, presentationTimeStamp: CMTime) {
+        guard !data.isEmpty else { return }
         writeSampleBuffer(
             TSWriter.defaultAudioPID,
             streamID: 192,
-            bytes: bytes,
-            count: count,
+            bytes: data[0].mData?.assumingMemoryBound(to: UInt8.self),
+            count: data[0].mDataByteSize,
             presentationTimeStamp: presentationTimeStamp,
-            decodeTimeStamp: CMTime.invalid,
+            decodeTimeStamp: .invalid,
             randomAccessIndicator: true
         )
     }
@@ -223,7 +231,7 @@ extension TSWriter: VideoEncoderDelegate {
             let avcC: Data = AVCConfigurationRecord.getData(formatDescription) else {
             return
         }
-        var data: ElementaryStreamSpecificData = ElementaryStreamSpecificData()
+        var data = ElementaryStreamSpecificData()
         data.streamType = ElementaryStreamType.h264.rawValue
         data.elementaryPID = TSWriter.defaultVideoPID
         PMT.elementaryStreamSpecificData.append(data)
@@ -266,7 +274,7 @@ class TSFileWriter: TSWriter {
     private var sequence: Int = 0
 
     var playlist: String {
-        var m3u8: M3U = M3U()
+        var m3u8 = M3U()
         m3u8.targetDuration = segmentDuration
         if sequence <= TSFileWriter.defaultSegmentMaxCount {
             m3u8.mediaSequence = 0
@@ -290,8 +298,7 @@ class TSFileWriter: TSWriter {
         if duration <= segmentDuration {
             return
         }
-
-        let fileManager: FileManager = FileManager.default
+        let fileManager = FileManager.default
 
         #if os(OSX)
         let bundleIdentifier: String? = Bundle.main.bundleIdentifier
@@ -309,7 +316,7 @@ class TSFileWriter: TSWriter {
         }
 
         let filename: String = Int(timestamp.seconds).description + ".ts"
-        let url: URL = URL(fileURLWithPath: temp + filename)
+        let url = URL(fileURLWithPath: temp + filename)
 
         if let currentFileURL: URL = currentFileURL {
             files.append(M3UMediaInfo(url: currentFileURL, duration: duration))
@@ -339,7 +346,6 @@ class TSFileWriter: TSWriter {
         currentFileHandle = try? FileHandle(forWritingTo: url)
 
         writeProgram()
-
         rotatedTimestamp = timestamp
     }
 
@@ -347,6 +353,7 @@ class TSFileWriter: TSWriter {
         nstry({
             self.currentFileHandle?.write(data)
         }, { exception in
+            self.currentFileHandle?.write(data)
             logger.warn("\(exception)")
         })
         super.write(data)
@@ -367,7 +374,7 @@ class TSFileWriter: TSWriter {
     }
 
     private func removeFiles() {
-        let fileManager: FileManager = FileManager.default
+        let fileManager = FileManager.default
         for info in files {
             do {
                 try fileManager.removeItem(at: info.url as URL)

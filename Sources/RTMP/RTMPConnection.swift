@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 /**
@@ -30,13 +31,13 @@ open class Responder: NSObject {
  flash.net.NetConnection for Swift
  */
 open class RTMPConnection: EventDispatcher {
-    static public let defaultWindowSizeS: Int64 = 250000
-    static public let supportedProtocols: Set<String> = ["rtmp", "rtmps", "rtmpt", "rtmpts"]
-    static public let defaultPort: Int = 1935
-    static public let defaultFlashVer: String = "FMLE/3.0 (compatible; FMSc/1.0)"
-    static public let defaultChunkSizeS: Int = 1024 * 8
-    static public let defaultCapabilities: Int = 239
-    static public let defaultObjectEncoding: UInt8 = 0x00
+    public static let defaultWindowSizeS: Int64 = 250000
+    public static let supportedProtocols: Set<String> = ["rtmp", "rtmps", "rtmpt", "rtmpts"]
+    public static let defaultPort: Int = 1935
+    public static let defaultFlashVer: String = "FMLE/3.0 (compatible; FMSc/1.0)"
+    public static let defaultChunkSizeS: Int = 1024 * 8
+    public static let defaultCapabilities: Int = 239
+    public static let defaultObjectEncoding: UInt8 = 0x00
 
     /**
      NetStatusEvent#info.code for NetConnection
@@ -91,31 +92,31 @@ open class RTMPConnection: EventDispatcher {
     }
 
     enum SupportVideo: UInt16 {
-        case unused    = 0x0001
-        case jpeg      = 0x0002
-        case sorenson  = 0x0004
-        case homebrew  = 0x0008
-        case vp6       = 0x0010
-        case vp6Alpha  = 0x0020
+        case unused = 0x0001
+        case jpeg = 0x0002
+        case sorenson = 0x0004
+        case homebrew = 0x0008
+        case vp6 = 0x0010
+        case vp6Alpha = 0x0020
         case homebrewv = 0x0040
-        case h264      = 0x0080
-        case all       = 0x00FF
+        case h264 = 0x0080
+        case all = 0x00FF
     }
 
     enum SupportSound: UInt16 {
-        case none    = 0x0001
-        case adpcm   = 0x0002
-        case mp3     = 0x0004
-        case intel   = 0x0008
-        case unused  = 0x0010
-        case nelly8  = 0x0020
-        case nelly   = 0x0040
-        case g711A   = 0x0080
-        case g711U   = 0x0100
+        case none = 0x0001
+        case adpcm = 0x0002
+        case mp3 = 0x0004
+        case intel = 0x0008
+        case unused = 0x0010
+        case nelly8 = 0x0020
+        case nelly = 0x0040
+        case g711A = 0x0080
+        case g711U = 0x0100
         case nelly16 = 0x0200
-        case aac     = 0x0400
-        case speex   = 0x0800
-        case all     = 0x0FFF
+        case aac = 0x0400
+        case speex = 0x0800
+        case all = 0x0FFF
     }
 
     enum VideoFunction: UInt8 {
@@ -129,8 +130,8 @@ open class RTMPConnection: EventDispatcher {
             return command
         }
 
-        let query: String = String(description[description.index(index, offsetBy: 1)...])
-        let challenge: String = String(format: "%08x", arc4random())
+        let query = String(description[description.index(index, offsetBy: 1)...])
+        let challenge = String(format: "%08x", arc4random())
         let dictionary: [String: String] = URL(string: "http://localhost?" + query)!.dictionaryFromQuery()
 
         var response: String = MD5.base64("\(url.user!)\(dictionary["salt"]!)\(url.password!)")
@@ -179,11 +180,11 @@ open class RTMPConnection: EventDispatcher {
         return streams.count
     }
     /// The statistics of outgoing queue bytes per second.
-    @objc dynamic open private(set) var previousQueueBytesOut: [Int64] = []
+    @objc open dynamic private(set) var previousQueueBytesOut: [Int64] = []
     /// The statistics of incoming bytes per second.
-    @objc dynamic open private(set) var currentBytesInPerSecond: Int32 = 0
+    @objc open dynamic private(set) var currentBytesInPerSecond: Int32 = 0
     /// The statistics of outgoing bytes per second.
-    @objc dynamic open private(set) var currentBytesOutPerSecond: Int32 = 0
+    @objc open dynamic private(set) var currentBytesOutPerSecond: Int32 = 0
 
     var socket: RTMPSocketCompatible!
     var streams: [UInt32: RTMPStream] = [: ]
@@ -205,6 +206,19 @@ open class RTMPConnection: EventDispatcher {
     }
     var windowSizeS: Int64 = RTMPConnection.defaultWindowSizeS
     var currentTransactionId: Int = 0
+
+    private var _audioEngine: AVAudioEngine?
+    var audioEngine: AVAudioEngine! {
+        get {
+            if _audioEngine == nil {
+                _audioEngine = AVAudioEngine()
+            }
+            return _audioEngine
+        }
+        set {
+            _audioEngine = newValue
+        }
+    }
 
     private var timer: Timer? {
         didSet {
@@ -243,7 +257,7 @@ open class RTMPConnection: EventDispatcher {
             return
         }
         currentTransactionId += 1
-        let message: RTMPCommandMessage = RTMPCommandMessage(
+        let message = RTMPCommandMessage(
             streamId: 0,
             transactionId: currentTransactionId,
             objectEncoding: objectEncoding,
@@ -295,7 +309,7 @@ open class RTMPConnection: EventDispatcher {
     }
 
     func createStream(_ stream: RTMPStream) {
-        let responder: Responder = Responder(result: { (data) -> Void in
+        let responder = Responder(result: { data -> Void in
             guard let id: Double = data[0] as? Double else {
                 return
             }
@@ -306,8 +320,9 @@ open class RTMPConnection: EventDispatcher {
         call("createStream", responder: responder)
     }
 
-    @objc func on(status: Notification) {
-        let e: Event = Event.from(status)
+    @objc
+    func on(status: Notification) {
+        let e = Event.from(status)
 
         guard
             let data: ASObject = e.data as? ASObject,
@@ -342,12 +357,12 @@ open class RTMPConnection: EventDispatcher {
                 let command: String = RTMPConnection.createSanJoseAuthCommand(uri, description: description)
                 connect(command, arguments: arguments)
             case description.contains("authmod=adobe"):
-                if user == "" || password == "" {
+                if user.isEmpty || password.isEmpty {
                     close(isDisconnected: true)
                     break
                 }
                 let query: String = uri.query ?? ""
-                let command: String = uri.absoluteString + (query == "" ? "?" : "&") + "authmod=adobe&user=\(user)"
+                let command: String = uri.absoluteString + (query.isEmpty ? "?" : "&") + "authmod=adobe&user=\(user)"
                 connect(command, arguments: arguments)
             default:
                 break
@@ -367,14 +382,14 @@ open class RTMPConnection: EventDispatcher {
             return nil
         }
 
-        var app: String = String(uri.path[uri.path.index(uri.path.startIndex, offsetBy: 1)...])
+        var app = String(uri.path[uri.path.index(uri.path.startIndex, offsetBy: 1)...])
         if let query: String = uri.query {
             app += "?" + query
         }
 
         currentTransactionId += 1
 
-        let message: RTMPCommandMessage = RTMPCommandMessage(
+        let message = RTMPCommandMessage(
             streamId: 0,
             transactionId: currentTransactionId,
             // "connect" must be a objectEncoding = 0
@@ -399,7 +414,8 @@ open class RTMPConnection: EventDispatcher {
         return RTMPChunk(message: message)
     }
 
-    @objc private func on(timer: Timer) {
+    @objc
+    private func on(timer: Timer) {
         let totalBytesIn: Int64 = self.totalBytesIn
         let totalBytesOut: Int64 = self.totalBytesOut
         currentBytesInPerSecond = Int32(totalBytesIn - previousTotalBytesIn)
@@ -485,7 +501,7 @@ extension RTMPConnection: RTMPSocketDelegate {
 
         if let message: RTMPMessage = chunk.message, chunk.ready {
             if logger.isEnabledFor(level: .trace) {
-                logger.trace(chunk.description)
+                logger.trace(chunk)
             }
             switch chunk.type {
             case .zero:

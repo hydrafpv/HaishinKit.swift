@@ -12,9 +12,9 @@ public protocol IEventDispatcher: class {
 
 public enum EventPhase: UInt8 {
     case capturing = 0
-    case atTarget  = 1
-    case bubbling  = 2
-    case dispose   = 3
+    case atTarget = 1
+    case bubbling = 2
+    case dispose = 3
 }
 
 // MARK: -
@@ -40,10 +40,6 @@ open class Event: NSObject {
     open fileprivate(set) var bubbles: Bool
     open fileprivate(set) var data: Any?
     open fileprivate(set) var target: AnyObject?
-
-    open override var description: String {
-        return Mirror(reflecting: self).description
-    }
 
     public init(type: String, bubbles: Bool = false, data: Any? = nil) {
         self.type = type
@@ -72,13 +68,13 @@ open class EventDispatcher: NSObject, IEventDispatcher {
         target = nil
     }
 
-    public final func addEventListener(_ type: String, selector: Selector, observer: AnyObject? = nil, useCapture: Bool = false) {
+    public func addEventListener(_ type: String, selector: Selector, observer: AnyObject? = nil, useCapture: Bool = false) {
         NotificationCenter.default.addObserver(
             observer ?? target ?? self, selector: selector, name: Notification.Name(rawValue: "\(type)/\(useCapture)"), object: target ?? self
         )
     }
 
-    public final func removeEventListener(_ type: String, selector: Selector, observer: AnyObject? = nil, useCapture: Bool = false) {
+    public func removeEventListener(_ type: String, selector: Selector, observer: AnyObject? = nil, useCapture: Bool = false) {
         NotificationCenter.default.removeObserver(
             observer ?? target ?? self, name: Notification.Name(rawValue: "\(type)/\(useCapture)"), object: target ?? self
         )
@@ -92,7 +88,7 @@ open class EventDispatcher: NSObject, IEventDispatcher {
         event.target = nil
     }
 
-    public final func dispatch(_ type: String, bubbles: Bool, data: Any?) {
+    public func dispatch(_ type: String, bubbles: Bool, data: Any?) {
         dispatch(event: Event(type: type, bubbles: bubbles, data: data))
     }
 }
